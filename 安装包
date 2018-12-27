@@ -1,0 +1,5 @@
+source(“http://bioconductor.org/biocLite.R”)
+biocLite(“EBImage”）
+#可以同时安装多个包
+biocLite(c(“pkg1″,”pkg2″))
+install.packages("XX")
