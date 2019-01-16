@@ -1,0 +1,16 @@
+
+Sub 循环语句()
+Dim i, j As Integer
+ For i = 2 To 262
+    For j = 2 To 19172
+    If Sheet4.Cells(i, 1) = Sheet1.Cells(j, 16) Then
+     Sheet4.Cells(i, 3) = Sheet1.Cells(j, 6)
+     
+   End If
+   
+   Next j
+     Next i
+     
+     
+End Sub
+
