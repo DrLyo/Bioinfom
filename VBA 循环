@@ -1,11 +1,11 @@
 
 Sub 循环语句()
 Dim i, j As Integer
- For i = 2 To 262
-    For j = 2 To 19172
-    If Sheet4.Cells(i, 1) = Sheet1.Cells(j, 16) Then
-     Sheet4.Cells(i, 3) = Sheet1.Cells(j, 6)
-     
+ For i = 2 To 924
+    For j = 2 To 186
+    If Sheet1.Cells(i, 1) = Sheet1.Cells(j, 8) Then
+     Sheet1.Cells(i, 2) = Sheet1.Cells(j, 9)
+     Exit For
    End If
    
    Next j
@@ -13,4 +13,3 @@ Dim i, j As Integer
      
      
 End Sub
-
