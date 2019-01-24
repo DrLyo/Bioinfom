@@ -1,0 +1,40 @@
+Sub 循环语句()
+Dim i, j, k, MyArray() As Integer
+Dim geneName As Integer
+Dim MaxRow As Integer
+Dim tmp As Integer
+
+geneName_phc1 = Worksheets("output").Range("A1").End(xlDown).Row
+MaxRow = Worksheets("test").Range("A1").End(xlDown).Row
+
+tmp = 0
+
+    For i = 1 To geneName_phc1
+        For j = 1 To MaxRow + 1
+            If Worksheets("test").Cells(j + 1, 8) = Worksheets("output").Cells(i, 1).Value Then
+                If (Worksheets("test").Cells(j + 1, 9).Value > tmp) Then
+                    Worksheets("test").Cells(j + 1, 9).Copy
+                Worksheets("output").Cells(i, 2).PasteSpecial
+                tmp = Worksheets("output").Cells(i, 2).Value
+                End If
+                Worksheets("test").Cells(j + 1, 9).Copy
+                Worksheets("output").Cells(i, 2).PasteSpecial
+                tmp = Worksheets("output").Cells(i, 2).Value
+            Else: Worksheets("output").Cells(i, 2).Value = "NULL"
+            Exit For
+            End If
+            Next j
+            tmp = 0
+            Next i
+                'For k = 1 To 15
+   '         ReDim MyArray(1 To k)
+    '        MyArray(k) = Sheet2.Cells(j, 9)
+     '       If MyArray(k) > Max Then
+      '          Max = MyArray(k)
+       '         Sheet4.Cells(i, 7).Value = Max
+        '    End If
+         '   Next k
+          '  Max = 0
+
+     
+End Sub
