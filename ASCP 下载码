@@ -4,3 +4,6 @@ ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-f
 #本次演示可直接用的单一下载：
 ascp -QT -l 300m -P33001 -k 1 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/SRR445/SRR445718/SRR445718.fastq.gz ./
 
+
+#Trimmomatic处理，过滤单端文件
+java -jar /home/lyocharles/biosoft/Trimmomatic-0.39/trimmomatic-0.39.jar SE -threads 4 -phred33 ./RNAseqlession/SRR445718.fastq.gz SRR445718_clean.fastq ILLUMINACLIP:/home/lyocharles/biosoft/Trimmomatic-0.39/adapters/TruSeq3-SE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
