@@ -1,0 +1,34 @@
+参考方法https://blog.csdn.net/qq_29300341/article/details/54811085
+
+#下载文章数据lncRNA-Induced Spread of Polycomb Controlled by Genome Architecture, RNA Abundance, and CpG Island DNA
+ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/SRR768/003/SRR7685833/SRR7685833_1.fastq.gz
+ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/SRR768/003/SRR7685833/SRR7685833_2.fastq.gz
+ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/SRR768/004/SRR7685834/SRR7685834.fastq.gz
+ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/SRR768/001/SRR7685861/SRR7685861.fastq.gz
+ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/
+
+"命令 &"，把命令放入后台执行
+第一种把命令放入后台的方法是在命令后面加入 空格 &。使用这种方法放入后台的命令，在后台处于执行状态。
+gunzip 把文件解压缩 并删除原文件
+gunzip SRR7685833_1.fastq.gz 
+gunzip SRR7685833_2.fastq.gz 
+gunzip SRR7685834.fastq.gz 
+gunzip SRR7685861.fastq.gz &  #后台运行
+
+安装fastqc
+Ubuntu软件包内自带Fastqc
+故安装命令sudo apt install fastqc
+
+3.2 使用FastQC进行质量检查
+fastqc命令：
+
+fastqc -o . -t 5 -f fastq SRR7685833_1.fastq
+fastqc -o . -t 5 -f fastq SRR7685833_2.fastq &
+fastqc -o . -t 5 -f fastq SRR7685834.fastq &
+fastqc -o . -t 5 -f fastq SRR7685861.fastq &
+-o . 将结果输出到当前目录
+-t 5 表示开5个线程运行  # 本服务器只有4个线程
+-f fastq SRR3101251.fastq 表示输入的文件
+（要分别对四个fastq文件执行四次）
+
+
