@@ -31,4 +31,55 @@ fastqc -o . -t 5 -f fastq SRR7685861.fastq &
 -f fastq SRR3101251.fastq 表示输入的文件
 （要分别对四个fastq文件执行四次）
 
+#参考https://www.jianshu.com/p/1f5bb1dab2f4
+#Bowtie 比对
+bowtie2  -p 8 -x index -1 test_read1.fq -2 test_read2.fq -S test_pe.sam # 双端比对
 
+bowtie2 -p 16 -3 5 --local -x /home/lyo/mm9 -1 P5-H3k27ace_BKDL202555193-1a_1.clean.fq.gz -2 P5-H3k27ace_BKDL202555193-1a_2.clean.fq.gz | samtools sort -O bam -o /home/lyo/slgP5Chip/P5-H3k27ace.bam
+bowtie2 -p 16 -3 5 --local -x /home/lyo/mm9 -1 P5-Flag_BKDL202555192-1a_1.clean.fq.gz -2 P5-Flag_BKDL202555192-1a_2.clean.fq.gz | samtools sort -O bam -o /home/lyo/slgP5Chip/P5-Flag.bam
+
+#MACS2 call peak
+macs2 callpeak -t /home/lyo/slgP5Chip/P5-Flag.bam -c /home/lyo/slgP5Chip/P5-IgG.bam -f BAM -g hs -n P5-Flag -B -q 0.01
+macs2 callpeak -t /home/lyo/slgP5Chip/P5-UB119.bam -c /home/lyo/slgP5Chip/P5-IgG.bam -f BAM -g hs -n P5-UB119 -B -q 0.01
+macs2 callpeak -t /home/lyo/slgP5Chip/P5-H3k27ace.bam -c /home/lyo/slgP5Chip/P5-IgG.bam -f BAM -g hs -n P5-H3k27ace -B -q 0.01
+
+#Chipseeker 注释
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+utils:::menuInstallLocal()
+
+BiocManager::install("ChIPseeker")
+BiocManager::install("GenomicFeatures")
+BiocManager::install("GenomeInfoDb")
+BiocManager::install("vctrs")
+BiocManager::install("org.Mm.eg.db")
+BiocManager::install("GO.db")
+BiocManager::install("DO.db")
+BiocManager::install("TxDb.Mmusculus.UCSC.mm9.knownGene")
+BiocManager::install("clusterProfiler")
+
+library("AnnotationDbi")
+library("org.Mm.eg.db")
+library("ChIPseeker")
+library("GenomeInfoDb")
+library("GenomicRanges")
+library("GenomicFeatures")
+library("TxDb.Mmusculus.UCSC.mm9.knownGene")
+library("clusterProfiler")
+
+setwd("G:/Stemcells/SLGbioinfo/SlgP5/")
+txdb <- TxDb.Mmusculus.UCSC.mm9.knownGene
+P5_Flag <- readPeakFile("P5-Flag_peaks.narrowPeak")
+P5_Flag_peak <- annotatePeak(P5_Flag, tssRegion=c(-3000, 3000),
+                          TxDb=txdb, annoDb="org.Mm.eg.db")
+write.csv(P5_Flag_peak, file = "G:/Stemcells/SLGbioinfo/SlgP5/P5_Flag_peak.csv")
+
+P5_H3k27ace <- readPeakFile("P5-H3k27ace_peaks.narrowPeak")
+P5_H3k27ace_peaks <- annotatePeak(P5_H3k27ace, tssRegion=c(-3000, 3000),
+                             TxDb=txdb, annoDb="org.Mm.eg.db")
+write.csv(P5_H3k27ace_peaks, file = "G:/Stemcells/SLGbioinfo/SlgP5/P5_H3k27ace_peaks.csv")
+
+P5_UB119 <- readPeakFile("P5-UB119_peaks.narrowPeak")
+P5_UB119_peaks <- annotatePeak(P5_UB119, tssRegion=c(-3000, 3000),
+                                  TxDb=txdb, annoDb="org.Mm.eg.db")
+write.csv(P5_UB119_peaks , file = "G:/Stemcells/SLGbioinfo/SlgP5/P5_UB119_peaks.csv")
