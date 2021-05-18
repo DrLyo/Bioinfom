@@ -1,0 +1,346 @@
+#代码参考https://www.jianshu.com/p/849f8ada0ab7 和https://www.jianshu.com/p/72c871663e62
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+#BiocManager::install("DESeq2")
+#BiocManager::install("dplyr")
+#BiocManager::install("biomaRt")
+#::install("enrichplot")
+#BiocManager::install("ggnewscale")
+#BiocManager::install("clusterProfiler")# Y叔写的非常强大的富集分析神包
+#::install("org.Mm.eg.db")
+#BiocManager::install("pheatmap")
+
+setwd("E:/Stemcells/USP7bioinfo/RNAseqchoosed")
+options(stringsAsFactors = FALSE)  # 首先检查BioManager包是否安???
+
+
+#对count列表加列???
+Ctr1 <-read.table("plko_1.count",sep = "\t",col.names = c("gene_id","Ctr1"))
+Ctr3 <-read.table("plko_3.count",sep = "\t",col.names = c("gene_id","Ctr3"))
+Ctr1st <-read.table("shNC_1_1st.count",sep = "\t",col.names = c("gene_id","Ctr1st"))
+
+KD1 <-read.table("sh2_1.count",sep = "\t",col.names = c("gene_id","KD1"))
+KD2 <-read.table("sh2_2.count",sep = "\t",col.names = c("gene_id","KD2"))
+KD3 <-read.table("sh2_3.count",sep = "\t",col.names = c("gene_id","KD3"))
+
+
+
+#合并矩阵
+raw_count_ctr<- merge(merge(Ctr1, Ctr3,  by="gene_id"),Ctr1st, by="gene_id")
+
+
+raw_count_KD <- merge(merge(KD1, KD2,  by="gene_id"),KD3, by="gene_id")
+raw_count <- merge(raw_count_ctr, raw_count_KD, by="gene_id")
+
+
+raw_count_filt <- raw_count[-1:-5,] #删前5行
+ENSEMBL <- gsub("\\.\\d*", "", raw_count_filt$gene_id)  #把ensemble ID里的小数点去掉，因为无法识别
+row.names(raw_count_filt) <- ENSEMBL #将ENSEMBL重新添加到raw_count_filt矩阵
+head(raw_count_filt)
+ #以上都对。
+
+ mycounts <- raw_count_filt[,-1]
+ head(mycounts)
+  condition <- factor(c(rep("control",3),rep("treat",3)), levels = c("control","treat"))
+  condition
+  colData <- data.frame(name=colnames(mycounts), condition)
+  colData
+library("DESeq2")
+#参考https://www.jianshu.com/p/604b852d301d 
+#countData叫表达矩??? ，colData又叫样品信息矩阵???
+
+  
+  #构建矩阵
+  dds <- DESeqDataSetFromMatrix(countData = mycounts, colData, design= ~ condition)
+  colData(dds)
+  #数据过滤，把没有的清除，可以加快后续运算
+  nrow(dds)
+  dds2 <- dds[ rowSums(counts(dds)) > 1, ]
+  nrow(dds2)
+  head(dds2)
+  ##差异运算 ###
+  dds3 <- DESeq(dds2)
+  
+  #将结果提取出来, 显示列名，然后是分子，分母。control 放后面
+  res = results(dds3, contrast=c("condition","treat","control"),tidy = T)
+  summary(res)
+  
+  # 用bioMart对差异表达基因进行注释
+  library("biomaRt")
+  library("curl")
+  library("dplyr")
+  mart <- useDataset("mmusculus_gene_ensembl", useMart("ensembl"))
+  my_ensembl_gene_id <- res[,1]
+  head(my_ensembl_gene_id)
+  
+  # mms_symbols <- getBM(attributes=c('ensembl_gene_id','external_gene_name',"description"), 
+   #              filters = 'ensembl_gene_id', values = my_ensembl_gene_id, mart = mart)
+  
+  mms_symbols <- getBM(attributes= c('ensembl_gene_id','external_gene_name'),
+                       filters = 'ensembl_gene_id', values = my_ensembl_gene_id, mart = mart)
+  head(mms_symbols)
+  #res 的第一列行名为row 需改为'ensembl_gene_id' 才能合并
+  colnames(res)[1] <- 'ensembl_gene_id'
+  noted_res <- merge(mms_symbols, res, by = "ensembl_gene_id") 
+    #保存注释后的结果
+  write.csv(noted_res, file="noted_res.csv")
+  
+  #分别提取上下调基因
+  up<-subset(noted_res,pvalue<=0.05 & log2FoldChange>=1)
+  down<-subset(noted_res,pvalue<=0.05 & log2FoldChange<= -1)
+  none<-subset(noted_res,pvalue>0.05 | (log2FoldChange < 1 &log2FoldChange > -1))
+  write.csv(up, file="up.csv")
+  write.csv(down, file="down.csv")
+  write.csv(none, file="none.csv")
+  
+  
+  #为了后续GSEA排序，将结果按LogFC排序
+  noted_res_order <- noted_res[order(noted_res$log2FoldChange),]# 有-就是从大到小排列
+  #noted_res_order2 <- noted_res[order( noted_res$log2FoldChange),] 无-就是从小到大排列
+  noted_res_diff <- noted_res_order%>%filter(pvalue<0.05&abs(log2FoldChange)>1)
+  #将行名变为gene名
+  rownames(noted_res_diff) <- noted_res_diff$external_gene_name
+  noted_res_diff2 <- noted_res_diff[,-1]
+  #将第一列名改为SYMBOL
+  names(noted_res_diff2)[1] <- "SYMBOL"
+  
+  #GSEA富集分析 
+ 
+  library("clusterProfiler")
+  library("org.Mm.eg.db")
+  eg <- bitr(noted_res_diff2$SYMBOL, fromType = "SYMBOL", toType = "ENTREZID", OrgDb = "org.Mm.eg.db") 
+   #org.Hs.eg.db是人的数据
+  noted_res_diff3 <- inner_join(eg, noted_res_diff2,by = "SYMBOL")
+  #做GSEA分析需要将所有的
+  noted_res_order2 <- noted_res_order[,-1]
+  names(noted_res_order2)[1] <- "SYMBOL"
+  all <-  bitr(noted_res_order2$SYMBOL, fromType = "SYMBOL", toType = "ENTREZID", 
+               OrgDb = "org.Mm.eg.db")
+  
+  noted_res_all <- inner_join(all,noted_res_order2,by="SYMBOL")
+  geneorder <- noted_res_all$log2FoldChange
+  geneorder
+  #geneorder原本只是一列数字，names是把这些数字 都增加一个名字，这个名字就是ENTREZID
+  names(geneorder) <- noted_res_all$ENTREZID
+  
+  noted_res_up <- noted_res_all%>%filter(pvalue<0.05& log2FoldChange>1)
+  noted_res_down <- noted_res_all%>%filter(pvalue<0.05& log2FoldChange < -1)
+  
+  #数据转换
+  rld <- rlog(dds3, blind=FALSE)
+  #blind，转换时是否忽视实验设计。blind=T，不考虑实验设计；blind=F，考虑实验设计
+  head(rld)
+  head(assay(rld), 3)
+  assay_rld <-  assay(rld)
+  write.csv(assay_rld, file="assay_rld.csv")
+  #pca plot
+  plotPCA(rld,  intgroup =  "condition")
+  
+ 
+  
+  up_id <- as.vector(head(noted_res_up$SYMBOL,300))
+  down_id <- as.vector(head(noted_res_down$SYMBOL,300))
+  
+  diff_ID_300 <- c(up_id, down_id)
+  
+  
+  normalized_counts <- counts(dds3, normalized=TRUE)
+  head(normalized_counts)
+  library(dplyr)
+  normalized_counts2 <- data.frame(names = row.names(normalized_counts), normalized_counts)
+  names(normalized_counts2)[1] <- "ensembl_gene_id"
+  normalized_counts3 <- merge(mms_symbols, normalized_counts2, by = "ensembl_gene_id") 
+  diff_top300_expr <- normalized_counts3[normalized_counts3$external_gene_name %in% diff_ID_300,]
+  diff_top300_expr2 <- diff_top300_expr[,-2]
+  rownames(diff_top300_expr2) <-diff_top300_expr2[,1]
+  diff_top300_expr3 <- diff_top300_expr2[,-1]
+  library(pheatmap)
+  pheatmap(diff_top300_expr3, #热图数据
+           cluster_rows = T,#行聚类
+           cluster_cols = F,#列聚类，可以看出样本之间的区分度，默认T，通常为了图形好看，都设为F
+           annotation_col=df, #标注样本分类
+           annotation_legend = F ,#显示注释
+           show_rownames = F, #基因名太多，通常不显示
+           show_colnames = T,
+           scale = "row", #以行来标准化，这个功能很不错
+           cellheight = 0.5,cellwidth = 20,
+           color = colorRampPalette(colors = c("deepskyblue4","white","brown2"))(100))
+  
+  
+  #heatmap[差异基因，变异度最大的基因]
+  
+  library("genefilter")
+  library("pheatmap")
+  topVarGenes <- head(order(rowVars(assay(rld)),decreasing=TRUE),500)
+  mat <- assay(rld)[ topVarGenes, ]
+  mat <- mat - rowMeans(mat) #此为张鸿的标准化方法。不好用？
+ 
+  
+  df <- as.data.frame(colData(rld)["condition"])
+  #添加基因名作图,show_rownames=FALSE为不显示基因名
+  pheatmap(mat, #热图数据
+           cluster_rows = T,#行聚类
+           cluster_cols = F,#列聚类，可以看出样本之间的区分度，默认T，通常为了图形好看，都设为F
+           annotation_col=df, #标注样本分类
+           annotation_legend = F ,#显示注释
+           show_rownames = F, #基因名太多，通常不显示
+           show_colnames = T,
+           scale = "row", #以行来标准化，这个功能很不错
+           color = colorRampPalette(colors = c("darkcyan","white","brown1"))(100))
+  
+  #火山图
+  #加载工具包：
+  library(ggplot2)
+  library(ggrepel)
+  vodata <- noted_res_order 
+  # 根据阈值分别为上调基因设置‘up’，下调基因设置‘Down’，无差异设置‘Stable’，保存到change列
+  # 这里的sigificant列用来设置火山图点的颜色
+  vodata$sigificant <- ifelse(vodata$pvalue<0.05 &abs(vodata$log2FoldChange)>1, 
+                          ifelse(vodata$log2FoldChange> 1 ,'Up','Down'),
+                          'Stable')
+  
+  # vodata原本是没有sigificant列的，增加显著与否列
+  vodata2 <- na.omit(vodata)#可以选择去除NA的，但本次没有，就省了
+  table(vodata$sigificant)
+  p <- ggplot(data = vodata2, aes(x=log2FoldChange, y = -log10(pvalue),color=sigificant))+
+    geom_point(alpha=0.8,size=1.2)+
+    scale_color_manual(values=c("darkcyan","black","brown2"))+
+    labs(title = "volcanoplot",x="log2(fold change)",y="-log10(p-value)")+
+    theme(plot.title = element_text(hjust = 0.4))+
+    geom_hline(yintercept = -log10(0.05),lty=4,lwd=0.6,alpha=0.8)+
+    geom_vline(xintercept = c(1,-1),lty=4,lwd=0.6,alpha=0.8)+
+    theme_bw()+
+    theme(panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          axis.line = element_line(colour = "black"))
+  p
+  ?colour
+  dev.off()
+  p+geom_text_repel(data=subset(vodata,abs(log2FoldChange)>4.5),aes(label=external_gene_name),
+                    col="black",alpha=0.8)   
+  ggsave("vocanol.pdf", width = 7.09,heght=5.6,dpi=300)
+  
+  ###KEGG 富集分析
+  kk <- enrichKEGG(gene = noted_res_diff3$ENTREZID,
+                   organism= "mmu",#人 hsa
+                   pvalueCutoff=1,
+                   qvalueCutoff=1)
+  tmp <- data.frame(kk)
+  ?enrichKEGG
+  head(tmp)
+  library(enrichplot)#展示kegg结果
+  barplot(kk,showCategory = 20)
+  dotplot(kk,showCategory = 20) 
+  #tmp文件里面没有Gene ID
+  kkx <- setReadable(kk,"org.Mm.eg.db","ENTREZID")#加上基因名称
+  tmp2 <- data.frame(kkx)
+  ?cnetplot#Gene-Concept Network
+  library(ggnewscale)
+  cnetplot_1 <- cnetplot(kkx,foldChange = geneorder)
+  cnetplot_1
+  cnetplot_2 <- cnetplot(kkx,categorySize="pvalue",foldChange = geneorder)
+  cnetplot_2
+  cnetplot_3 <- cnetplot(kkx,circular = T,colorEdge = T)
+  cnetplot_3
+  
+  
+  #####GO###
+  up_BP <- enrichGO(gene = noted_res_up$ENTREZID,
+                  OrgDb = org.Mm.eg.db,
+                  ont = "BP", # BP、CC、MF，通常只做BP
+                  pAdjustMethod = "BH",
+                  pvalueCutoff = 0.01,
+                  qvalueCutoff = 0.05,
+                  readable = T)
+  
+  barplot(up_BP ,showCategory = 20)
+  dotplot(up_BP ,showCategory = 20) 
+  
+  down_BP <- enrichGO(gene = noted_res_down$ENTREZID,
+                    OrgDb = org.Mm.eg.db,
+                    ont = "BP", # BP、CC、MF，通常只做BP
+                    pAdjustMethod = "BH",
+                    pvalueCutoff = 0.01,
+                    qvalueCutoff = 0.05,
+                    readable = T)
+ 
+  barplot(down_BP ,showCategory = 20)
+  dotplot(down_BP ,showCategory = 20) 
+  ###CC##
+  up_CC <- enrichGO(gene = noted_res_up$ENTREZID,
+                    OrgDb = org.Mm.eg.db,
+                    ont = "CC", # BP、CC、MF，通常只做BP
+                    pAdjustMethod = "BH",
+                    pvalueCutoff = 0.01,
+                    qvalueCutoff = 0.05,
+                    readable = T)
+  
+  barplot(up_CC ,showCategory = 20)
+  dotplot(up_CC ,showCategory = 20) 
+  
+  down_CC <- enrichGO(gene = noted_res_down$ENTREZID,
+                    OrgDb = org.Mm.eg.db,
+                    ont = "CC", # BP、CC、MF，通常只做BP
+                    pAdjustMethod = "BH",
+                    pvalueCutoff = 0.01,
+                    qvalueCutoff = 0.05,
+                    readable = T)
+  
+  barplot(down_CC ,showCategory = 20)
+  dotplot(down_CC ,showCategory = 20) ###这个是个空结果
+  
+  ###MF##
+  up_MF <- enrichGO(gene = noted_res_up$ENTREZID,
+                    OrgDb = org.Mm.eg.db,
+                    ont = "MF", # BP、CC、MF，通常只做BP
+                    pAdjustMethod = "BH",
+                    pvalueCutoff = 0.01,
+                    qvalueCutoff = 0.05,
+                    readable = T)
+  
+  barplot(up_MF ,showCategory = 20)
+  dotplot(up_MF ,showCategory = 20) 
+  
+  down_MF <- enrichGO(gene = noted_res_down$ENTREZID,
+                    OrgDb = org.Mm.eg.db,
+                    ont = "MF", # BP、CC、MF，通常只做BP
+                    pAdjustMethod = "BH",
+                    pvalueCutoff = 0.01,
+                    qvalueCutoff = 0.05,
+                    readable = T)
+  
+  barplot(down_MF ,showCategory = 20)
+  dotplot(down_MF ,showCategory = 20) ##也没有数据
+  
+  ####GSEA###
+  library(enrichplot)
+  geneorder <- sort(geneorder, decreasing = TRUE)
+  GSEA1 <- gseKEGG(geneList = geneorder,# geneorder要没有NA值
+                   organism = "mmu",
+                   nPerm  = 1000,
+                   minGSSize = 120,
+                   pvalueCutoff = 1,
+                   verbose = F)
+  head(GSEA1)
+  tmp3 <- data.frame(GSEA1)
+  gseaplot2(GSEA1, geneSetID = 5)#这个做图是文章发表及的图
+  gseaplot2(GSEA1,
+            geneSetID = c(1:7), #显示那几个
+            pvalue_table = T,)#是否显示P值
+            #color = c("#E495A5","#86B875","#7DB0DD"), )
+ 
+  #MA图
+  plotMA(res, ylim=c(-5,5))
+  #"M" for minus（减）, because a log ratio is equal to log minus log, and "A" for average（均值）
+  #M对应差异对比组之间基因表达变化log2 fold changes (Y轴)
+  #A对应差异对比组基因表达量均值the mean of normalized counts (X轴)
+  plotMA(res, alpha = 0.1, main = "", xlab = "mean of normalized counts", ylim=c(-5,5))
+  #alpha为padj显著性水平阈值，默认alpha=0.1
+  #Each gene is represented with a dot. Genes with an adjusted p value below a threshold (here 0.1, the default) are shown in red.
+  plotMA(resLFC, ylim=c(-5,5))  #提高了log2 fold change阈值
+  topGene <- rownames(resLFC)[which.min(resLFC$padj)]
+  with(resLFC[topGene, ], {
+    points(baseMean, log2FoldChange, col="dodgerblue", cex=2, lwd=2)
+    text(baseMean, log2FoldChange, topGene, pos=2, col="dodgerblue")
+  })  #标记出一个特定的基因
