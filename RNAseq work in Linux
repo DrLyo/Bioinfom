@@ -1,0 +1,114 @@
+#安装Hisat2 
+conda install Hisat2 
+hisat2 -t -p 4 -x  /home/lyo/references/hisat2_index/mm10/genome -1 /home/lyo/RNAseq/plko_1st_1.clean.fq.gz -2 /home/lyo/RNAseq/plko_1st_2.clean.fq.gz -S plko_1st.sam
+hisat2 -t -p 4 -x  /home/lyo/references/hisat2_index/mm10/genome -1 /home/lyo/RNAseq/sh2_1st_1.clean.fq.gz -2 /home/lyo/RNAseq/sh2_1st_2.clean.fq.gz -S sh2_1st.sam
+
+#hisat2 index下载地址
+wget ftp://ftp.ccb.jhu.edu/pub/infphilo/hisat2/data/mm10.tar.gz
+tar -zxvf *.tar.gz
+# 删除压缩包
+$ rm -rf *.tar.gz
+
+samtools view -S plko_1st.sam -b > plko_1st.bam
+    samtools sort plko_1st.bam -o plko_1st_sorted.bam
+    samtools index plko_1st_sorted.bam
+
+samtools view -S sh2_1st.sam -b > sh2_1st.bam
+    samtools sort sh2_1st.bam -o sh2_1st_sorted.bam
+    samtools index sh2_1st_sorted.bam
+#再按name 进行sort
+   samtools sort -n plko_1st.bam -o plko_1st_namesorted.bam
+   samtools sort sh2_1st.bam -o sh2_1st_namesorted.bam
+
+# 安装
+conda install htseq
+#-f bam/sam： 指定输入文件格式，默认SAM
+#-r name/pos: 你需要利用samtool sort对数据根据read name或者位置进行排序，默认是name
+#-s yes/no/reverse: 数据是否来自于strand-specific assay。DNA是双链的，所以需要判断到底来自于哪条链。如果选择了no， 那么每一条read都会跟正义链和反义链进行比较。默认的yes对于双端测序表示第一个read都在同一个链上，第二个read则在另一条链上。
+#-a 最低质量， 剔除低于阈值的read
+#-m 模式 union（默认）, intersection-strict and intersection-nonempty。一般而言就用默认的，作者也是这样认为的。
+#-i id attribute: 在GTF文件的最后一栏里，会有这个基因的多个命名方式（如下）， RNA-Seq数据分析常用的是gene_id， 当然你可以写一个脚本替换成其他命名方式。
+
+#官网：http://www.gencodegenes.org
+#进入官网后直接下载对应hg19的最新人类的基因组注释文件（Data-----Human-----GRCh37-mapped Releases-----选择2016年10月份发布的最新注释版本“gencode.v26lift37.annotation.gtf.gz”），注意注释文件的格式一般是gtf或者gff3格式的，
+
+htseq-count -r name -f bam /home/lyo/RNAseq/plko_1st_namesorted.bam /home/lyo/references/htseq_index/gencode.vM25.annotation.gtf > plko_1st.count 
+htseq-count -r name -f bam /home/lyo/RNAseq/sh2_1st_namesorted.bam /home/lyo/references/htseq_index/gencode.vM25.annotation.gtf > sh2_1st.count 
+
+#参考https://www.jianshu.com/p/72c871663e62
+   #  https://www.jianshu.com/p/849f8ada0ab7
+#2021.2.12
+#双端过滤
+fastp -i reads.1.fq.gz -I reads.2.fq.gz -o clean.1.fq.gz -O clean.2.fq.gz -z 4 -q 20 -u 30 -n 10 -h clean.html
+
+fastp -i Mesc-plko-1_R1.fq.gz -I Mesc-plko-1_R2.fq.gz -o Mesc_plko_1_R1_clean.fq.gz -O Mesc_plko_1_R2_clean.fq.gz -z 4 -q 20 -u 30 -n 10 -h esc_plko_1.html
+
+fastp -i Mesc-plko-2_R1.fq.gz -I Mesc-plko-2_R2.fq.gz -o Mesc_plko_2_R1_clean.fq.gz -O Mesc_plko_2_R2_clean.fq.gz -z 4 -q 20 -u 30 -n 10 -h esc_plko_2.html
+fastp -i Sh2-d8-1_R1.fq.gz -I Sh2-d8-1_R2.fq.gz -o Sh2_d8_1_R1_clean.fq.gz -O Sh2_d8_1_R2_clean.fq.gz -z 4 -q 20 -u 30 -n 10 -h Sh2_d8_1.html
+fastp -i Sh2-d8-2_R1.fq.gz -I Sh2-d8-2_R2.fq.gz -o Sh2_d8_2_R1_clean.fq.gz -O Sh2_d8_2_R2_clean.fq.gz -z 4 -q 20 -u 30 -n 10 -h Sh2_d8_2.html
+
+hisat2 -t -p 4 -x  /home/lyo/references/hisat2_index/mm10/genome -1 /home/lyo/RNAseq/Mesc_plko_1_R1_clean.fq.gz -2 /home/lyo/RNAseq/Mesc_plko_1_R2_clean.fq.gz -S Mesc_plko_1.sam
+hisat2 -t -p 4 -x  /home/lyo/references/hisat2_index/mm10/genome -1 /home/lyo/RNAseq/Mesc_plko_2_R1_clean.fq.gz -2 /home/lyo/RNAseq/Mesc_plko_2_R2_clean.fq.gz -S Mesc_plko_2.sam
+hisat2 -t -p 4 -x  /home/lyo/references/hisat2_index/mm10/genome -1 /home/lyo/RNAseq/Sh2_d8_1_R1_clean.fq.gz -2 /home/lyo/RNAseq/Sh2_d8_1_R2_clean.fq.gz -S Sh2_d8_1.sam
+hisat2 -t -p 4 -x  /home/lyo/references/hisat2_index/mm10/genome -1 /home/lyo/RNAseq/Sh2_d8_2_R1_clean.fq.gz -2 /home/lyo/RNAseq/Sh2_d8_2_R2_clean.fq.gz -S Sh2_d8_2.sam
+
+samtools view -S Mesc_plko_1.sam -b > Mesc_plko_1.bam
+    samtools sort Mesc_plko_1.bam -o Mesc_plko_1_sorted.bam
+    samtools index Mesc_plko_1_sorted.bam
+	
+samtools view -S Mesc_plko_2.sam -b > Mesc_plko_2.bam
+    samtools sort Mesc_plko_2.bam -o Mesc_plko_2_sorted.bam
+    samtools index Mesc_plko_2_sorted.bam	
+
+samtools view -S Sh2_d8_1.sam -b > Sh2_d8_1.bam
+    samtools sort Sh2_d8_1.bam -o Sh2_d8_1_sorted.bam
+    samtools index Sh2_d8_1_sorted.bam	
+	
+samtools view -S Sh2_d8_2.sam -b > Sh2_d8_2.bam
+    samtools sort Sh2_d8_2.bam -o Sh2_d8_2_sorted.bam
+    samtools index Sh2_d8_2_sorted.bam		
+
+htseq-count -r name -f bam /home/lyo/RNAseq/Mesc_plko_1_sorted.bam /home/lyo/references/htseq_index/gencode.vM25.annotation.gtf > Mesc_plko_1.count 
+htseq-count -r name -f bam /home/lyo/RNAseq/Mesc_plko_2_sorted.bam /home/lyo/references/htseq_index/gencode.vM25.annotation.gtf > Mesc_plko_2.count 
+htseq-count -r name -f bam /home/lyo/RNAseq/Sh2_d8_1_sorted.bam /home/lyo/references/htseq_index/gencode.vM25.annotation.gtf > Sh2_d8_1.count 
+htseq-count -r name -f bam /home/lyo/RNAseq/Sh2_d8_2_sorted.bam /home/lyo/references/htseq_index/gencode.vM25.annotation.gtf > Sh2_d8_2.count 
+
+#现在用featureCounts 进行定量 更快
+
+hisat2 -t -p 8 -x  /home/lyo/index/hisat2/mm10/genome -1 /home/lyo/RNA-seq20210506/plko-1_1.clean.fq.gz -2 /home/lyo/RNA-seq20210506/plko-1_2.clean.fq.gz -S plko_1.sam
+hisat2 -t -p 8 -x  /home/lyo/index/hisat2/mm10/genome -1 /home/lyo/RNA-seq20210506/plko-2_1.clean.fq.gz -2 /home/lyo/RNA-seq20210506/plko-2_2.clean.fq.gz -S plko_2.sam
+hisat2 -t -p 8 -x  /home/lyo/index/hisat2/mm10/genome -1 /home/lyo/RNA-seq20210506/plko-3_1.clean.fq.gz -2 /home/lyo/RNA-seq20210506/plko-3_2.clean.fq.gz -S plko_3.sam
+hisat2 -t -p 8 -x  /home/lyo/index/hisat2/mm10/genome -1 /home/lyo/RNA-seq20210506/sh2-1_1.clean.fq.gz -2 /home/lyo/RNA-seq20210506/sh2-1_2.clean.fq.gz -S sh2-1.sam
+hisat2 -t -p 8 -x  /home/lyo/index/hisat2/mm10/genome -1 /home/lyo/RNA-seq20210506/sh2-2_1.clean.fq.gz -2 /home/lyo/RNA-seq20210506/sh2-2_2.clean.fq.gz -S sh2-2.sam
+hisat2 -t -p 8 -x  /home/lyo/index/hisat2/mm10/genome -1 /home/lyo/RNA-seq20210506/sh2-3_1.clean.fq.gz -2 /home/lyo/RNA-seq20210506/sh2-3_2.clean.fq.gz -S sh2-3.sam
+
+samtools view -S plko_1.sam -b > plko_1.bam
+    samtools sort plko_1.bam -o plko_1_sorted.bam
+    samtools index plko_1_sorted.bam
+	
+samtools view -S plko_2.sam -b > plko_2.bam
+    samtools sort plko_2.bam -o plko_2_sorted.bam
+    samtools index plko_2_sorted.bam
+	
+samtools view -S plko_3.sam -b > plko_3.bam
+    samtools sort plko_3.bam -o plko_3_sorted.bam
+    samtools index plko_3_sorted.bam
+
+samtools view -S sh2-1.sam -b > sh2-1.bam
+    samtools sort sh2-1.bam -o sh2-1_sorted.bam
+    samtools index sh2-1_sorted.bam
+
+samtools view -S sh2-2.sam -b > sh2-2.bam
+    samtools sort sh2-2.bam -o sh2-2_sorted.bam
+    samtools index sh2-2_sorted.bam
+
+samtools view -S sh2-3.sam -b > sh2-3.bam
+    samtools sort sh2-3.bam -o sh2-3_sorted.bam
+    samtools index sh2-3_sorted.bam
+	
+htseq-count -r name -f bam /home/lyo/RNA-seq20210506/plko_1_sorted.bam /home/lyo/index/count/gencode.vM25.annotation.gtf > plko_1.count 
+htseq-count -r name -f bam /home/lyo/RNA-seq20210506/plko_2_sorted.bam /home/lyo/index/count/gencode.vM25.annotation.gtf > plko_2.count 
+htseq-count -r name -f bam /home/lyo/RNA-seq20210506/plko_3_sorted.bam /home/lyo/index/count/gencode.vM25.annotation.gtf > plko_3.count 
+htseq-count -r name -f bam /home/lyo/RNA-seq20210506/sh2-1_sorted.bam /home/lyo/index/count/gencode.vM25.annotation.gtf > sh2_1.count 
+htseq-count -r name -f bam /home/lyo/RNA-seq20210506/sh2-2_sorted.bam /home/lyo/index/count/gencode.vM25.annotation.gtf > sh2_2.count 
+htseq-count -r name -f bam /home/lyo/RNA-seq20210506/sh2-3_sorted.bam /home/lyo/index/count/gencode.vM25.annotation.gtf > sh2_3.count 
