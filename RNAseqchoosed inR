@@ -239,12 +239,9 @@ library("DESeq2")
   library(ggnewscale)
   cnetplot_1 <- cnetplot(kkx,foldChange = geneorder)
   cnetplot_1
-  cnetplot_2 <- cnetplot(kkx,categorySize="pvalue",foldChange = geneorder)
-  cnetplot_2
-  cnetplot_3 <- cnetplot(kkx,circular = T,colorEdge = T)
-  cnetplot_3
   
   
+  ?enrichGO
   #####GO###
   up_BP <- enrichGO(gene = noted_res_up$ENTREZID,
                   OrgDb = org.Mm.eg.db,
@@ -312,7 +309,16 @@ library("DESeq2")
   
   barplot(down_MF ,showCategory = 20)
   dotplot(down_MF ,showCategory = 20) ##也没有数据
+ 
+   up_All <- enrichGO(gene = noted_res_up$ENTREZID,
+                    OrgDb = org.Mm.eg.db,
+                    ont = "ALL", # BP、CC、MF，通常只做BP
+                    pAdjustMethod = "BH",
+                    pvalueCutoff = 0.01,
+                    qvalueCutoff = 0.05,
+                    readable = T)
   
+  barplot(up_All ,showCategory = 20)
   ####GSEA###
   library(enrichplot)
   geneorder <- sort(geneorder, decreasing = TRUE)
